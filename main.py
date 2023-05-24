@@ -10,10 +10,10 @@ from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot
 from PyQt5.QtWidgets import QApplication, QFileDialog, QMainWindow, QTableWidgetItem
 
 import png
-from main_window_ui import UiMainWindow
+from main_window_ui import MainWindowUi
 from printer import Printer
-from psx_panel.extract_psx import extract_textures
-from rle_panel.rle_helper import convert
+from psx.extract_psx import extract_textures
+from rle.rle_helper import convert
 
 # PSX PANEL SPECIFIC CODE STARTS HERE
 PRINT_OUTPUT = True
@@ -31,7 +31,7 @@ class NumericTableWidgetItem(QTableWidgetItem):
 
 
 # Define main window class, inherits QMainWindow and UiMainWindow
-class Window(QMainWindow, UiMainWindow):
+class Window(QMainWindow, MainWindowUi):
     # PSX
     psx_input_dir = ""
     psx_output_dir = ""
@@ -64,7 +64,7 @@ class Window(QMainWindow, UiMainWindow):
         if dir_name:
             self.psx_input_dir = dir_name
             self.current_psx_files = []
-            self.psx_panel.psx_file_table.setRowCount(0)
+            self.psx_ui.psx_file_table.setRowCount(0)
             self.get_psx_files(dir_name)
 
     # Filter files with .psx or .PSX extensions
@@ -73,18 +73,18 @@ class Window(QMainWindow, UiMainWindow):
 
     # Get .psx files from the chosen directory and update the GUI
     def get_psx_files(self, dir_name):
-        self.psx_panel.psx_input_path.setText(dir_name)
+        self.psx_ui.psx_input_path.setText(dir_name)
         dir_files = [f for f in os.listdir(dir_name) if os.path.isfile(os.path.join(dir_name, f))]
         psx_files = list(self.filter_psx_files(dir_files))
         if len(psx_files) > 0:
-            self.psx_panel.psx_file_table.setRowCount(len(psx_files))
+            self.psx_ui.psx_file_table.setRowCount(len(psx_files))
             for row, file in enumerate(psx_files):
                 self.current_psx_files.append(file)
-                self.psx_panel.psx_file_table.setItem(row, 0, QTableWidgetItem(file))
+                self.psx_ui.psx_file_table.setItem(row, 0, QTableWidgetItem(file))
             if self.psx_output_dir:
-                self.psx_panel.psx_extract_button.setEnabled(True)
+                self.psx_ui.psx_extract_button.setEnabled(True)
         else:
-            self.psx_panel.psx_extract_button.setEnabled(False)
+            self.psx_ui.psx_extract_button.setEnabled(False)
 
     # Open a directory picker and set the output directory path
     def psx_output_browse_clicked(self):
@@ -92,30 +92,30 @@ class Window(QMainWindow, UiMainWindow):
         dir_name = QFileDialog.getExistingDirectory(self, "Choose Directory", "", options=options)
         if dir_name:
             self.psx_output_dir = dir_name
-            self.psx_panel.psx_output_path.setText(dir_name)
+            self.psx_ui.psx_output_path.setText(dir_name)
             if len(self.current_psx_files) > 0:
-                self.psx_panel.psx_extract_button.setEnabled(True)
+                self.psx_ui.psx_extract_button.setEnabled(True)
             else:
-                self.psx_panel.psx_extract_button.setEnabled(False)
+                self.psx_ui.psx_extract_button.setEnabled(False)
 
     # Clear the Textures Extracted and Status columns
     def psx_clear_columns(self):
-        for row in range(self.psx_panel.psx_file_table.rowCount()):
-            self.psx_panel.psx_file_table.setItem(row, 2, NumericTableWidgetItem(""))
-            self.psx_panel.psx_file_table.setItem(row, 3, NumericTableWidgetItem(""))
+        for row in range(self.psx_ui.psx_file_table.rowCount()):
+            self.psx_ui.psx_file_table.setItem(row, 2, NumericTableWidgetItem(""))
+            self.psx_ui.psx_file_table.setItem(row, 3, NumericTableWidgetItem(""))
 
     # Start the extraction process when the extract button is clicked
     def psx_extract_clicked(self):
         # Cleanup previous state
         self.psx_clear_columns()
-        self.psx_panel.psx_progress_bar.setValue(0)
-        self.psx_panel.psx_extract_button.setEnabled(False)
-        self.psx_panel.psx_file_table.setSortingEnabled(False)
+        self.psx_ui.psx_progress_bar.setValue(0)
+        self.psx_ui.psx_extract_button.setEnabled(False)
+        self.psx_ui.psx_file_table.setSortingEnabled(False)
         self.psx_files_processed = 0
 
         # Start the extraction process
         self.start_time = datetime.now()
-        self.worker = Worker(self.current_psx_files, self.psx_input_dir, self.psx_output_dir, self.psx_panel.psx_file_table, self.psx_create_sub_dirs)
+        self.worker = Worker(self.current_psx_files, self.psx_input_dir, self.psx_output_dir, self.psx_ui.psx_file_table, self.psx_create_sub_dirs)
         self.worker.update_progress_bar_signal.connect(self.psx_update_progress_bar)
         self.worker.extraction_complete_signal.connect(self.psx_extraction_complete)
         self.worker.update_file_table_signal.connect(self.update_psx_file_table)
@@ -126,19 +126,19 @@ class Window(QMainWindow, UiMainWindow):
     def psx_update_progress_bar(self):
         self.psx_files_processed += 1
         progress = round(self.psx_files_processed / len(self.current_psx_files) * 100)
-        self.psx_panel.psx_progress_bar.setValue(progress)
+        self.psx_ui.psx_progress_bar.setValue(progress)
 
     # Update the file table in the GUI
     @pyqtSlot(int, int, str)
     def update_psx_file_table(self, row, col, text):
-        self.psx_panel.psx_file_table.setItem(row, col, NumericTableWidgetItem(text)) if col in [1, 2] else self.psx_panel.psx_file_table.setItem(row, col, QTableWidgetItem(text))
+        self.psx_ui.psx_file_table.setItem(row, col, NumericTableWidgetItem(text)) if col in [1, 2] else self.psx_ui.psx_file_table.setItem(row, col, QTableWidgetItem(text))
 
     # Update the UI and display the time elapsed when the extraction is complete
     @pyqtSlot()
     def psx_extraction_complete(self):
-        self.psx_panel.psx_progress_bar.setValue(100)
-        self.psx_panel.psx_extract_button.setEnabled(True)
-        self.psx_panel.psx_file_table.setSortingEnabled(True)
+        self.psx_ui.psx_progress_bar.setValue(100)
+        self.psx_ui.psx_extract_button.setEnabled(True)
+        self.psx_ui.psx_file_table.setSortingEnabled(True)
         self.status_bar.showMessage(f"Time elapsed: {(datetime.now() - self.start_time).total_seconds()}")
 
     # Toggle the create_sub_dirs boolean when the Create Subdirectories checkbox is clicked
@@ -154,36 +154,36 @@ class Window(QMainWindow, UiMainWindow):
         if dir_name:
             self.rle_input_dir = dir_name
             self.current_rle_files = []
-            self.rle_panel.rle_file_table.setRowCount(0)
+            self.rle_ui.rle_file_table.setRowCount(0)
             self.get_rle_files(dir_name)
 
     def filter_rle_files(self, file_list):
         return filter(lambda file: file.split(".")[-1].upper() == "RLE" or file.split(".")[-1].upper() == "BMR", file_list)
 
     def get_rle_files(self, dir_name):
-        self.rle_panel.rle_input_path.setText(dir_name)
+        self.rle_ui.rle_input_path.setText(dir_name)
         dir_files = [f for f in os.listdir(dir_name) if os.path.isfile(os.path.join(dir_name, f))]
         rle_files = list(self.filter_rle_files(dir_files))
         if len(rle_files) > 0:
-            self.rle_panel.rle_file_table.setRowCount(len(rle_files))
+            self.rle_ui.rle_file_table.setRowCount(len(rle_files))
             for row, file in enumerate(rle_files):
                 self.current_rle_files.append(file)
-                self.rle_panel.rle_file_table.setItem(row, 0, QTableWidgetItem(file))
+                self.rle_ui.rle_file_table.setItem(row, 0, QTableWidgetItem(file))
             if self.rle_output_dir != "":
-                self.rle_panel.rle_convert_button.setEnabled(True)
+                self.rle_ui.rle_convert_button.setEnabled(True)
         else:
-            self.rle_panel.rle_convert_button.setEnabled(False)
+            self.rle_ui.rle_convert_button.setEnabled(False)
 
     def rle_output_browse_clicked(self):
         options = QFileDialog.Options()
         dir_name = QFileDialog.getExistingDirectory(self, "Choose Directory", "", options=options)
         if dir_name:
             self.rle_output_dir = dir_name
-            self.rle_panel.rle_output_path.setText(dir_name)
+            self.rle_ui.rle_output_path.setText(dir_name)
             if len(self.current_rle_files) > 0:
-                self.rle_panel.rle_convert_button.setEnabled(True)
+                self.rle_ui.rle_convert_button.setEnabled(True)
             else:
-                self.rle_panel.rle_convert_button.setEnabled(False)
+                self.rle_ui.rle_convert_button.setEnabled(False)
 
     def write_to_png(self, filename, img_width, img_height, pixels):
         self.rle_files_converted += 1
@@ -197,21 +197,21 @@ class Window(QMainWindow, UiMainWindow):
         input_file.close()
 
     def rle_convert_clicked(self):
-        self.rle_panel.rle_progress_bar.setValue(0)
+        self.rle_ui.rle_progress_bar.setValue(0)
         for index, filename in enumerate(self.current_rle_files):
             try:
                 input_file = os.path.join(self.rle_input_dir, filename)
-                width = self.rle_panel.rle_width_selector.value()
+                width = self.rle_ui.rle_width_selector.value()
                 pixels = convert(input_file, width)
                 self.write_to_png(filename, width, len(pixels), pixels)
-                self.rle_panel.rle_file_table.setItem(index, 1, QTableWidgetItem("OK"))
+                self.rle_ui.rle_file_table.setItem(index, 1, QTableWidgetItem("OK"))
             except Exception as e:
                 self.printer("An error ocurred while trying to convert {}. The error was: {}", filename, e)
                 if PRINT_TRACEBACK:
                     traceback.print_exc()
-                self.rle_panel.rle_file_table.setItem(index, 1, QTableWidgetItem("ERROR"))
-            self.rle_panel.rle_progress_bar.setValue(round(index / len(self.current_rle_files) * 100))
-        self.rle_panel.rle_progress_bar.setValue(100)
+                self.rle_ui.rle_file_table.setItem(index, 1, QTableWidgetItem("ERROR"))
+            self.rle_ui.rle_progress_bar.setValue(round(index / len(self.current_rle_files) * 100))
+        self.rle_ui.rle_progress_bar.setValue(100)
 
     # RLE / BMR PANEL SPECIFIC CODE ENDS HERE
 

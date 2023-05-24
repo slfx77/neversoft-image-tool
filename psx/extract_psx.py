@@ -144,6 +144,8 @@ def extract_textures(filename, input_dir, output_dir, file_index, create_sub_dir
             palette_8bit = read_palettes(reader, output_strings, 256)
 
             num_actual_tex = struct.unpack("<I", reader.read(4))[0]
+            if num_actual_tex == 4294967295:
+                raise Exception("Unable to parse PSX texture library, PVR-T?")
             update_file_table(file_index, {1: str(num_actual_tex)})
             if PRINT_OUTPUT:
                 output_strings.append(f"Num actual textures: {num_actual_tex}")
